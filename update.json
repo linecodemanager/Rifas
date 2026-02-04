@@ -1,6 +1,6 @@
 {
   "versionCode": 2,
   "versionName": "1.1",
-  "updateUrl": "https://github.com/linecodemanager/Rifas/tree/main/app/release",
+  "updateUrl": "https://github.com/linecodemanager/Rifas/raw/main/app/release/app-release.apk",
   "description": "Nueva actualización disponible con mejoras en el panel principal y corrección de errores."
 }

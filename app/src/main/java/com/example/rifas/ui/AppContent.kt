@@ -1010,14 +1010,31 @@ fun DashboardScreen(
     val raffles by viewModel.raffles.collectAsState(initial = emptyList())
     val allSoldNumbers = remember { mutableStateListOf<SoldNumber>() }
     val updateAvailable by viewModel.updateAvailable
+    val isDownloading by viewModel.isDownloading
     
     // Verificar actualizaciones al iniciar el panel
     LaunchedEffect(Unit) {
         viewModel.checkForUpdates()
     }
 
+    // Diálogo de descarga en curso
+    if (isDownloading) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("Descargando...", fontWeight = FontWeight.Bold) },
+            text = { 
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Por favor espera mientras se descarga la nueva versión.")
+                }
+            },
+            confirmButton = { }
+        )
+    }
+
     // Diálogo de actualización
-    if (updateAvailable != null) {
+    if (updateAvailable != null && !isDownloading) {
         AlertDialog(
             onDismissRequest = { viewModel.updateAvailable.value = null },
             title = { Text("Actualización Disponible", fontWeight = FontWeight.Bold) },
