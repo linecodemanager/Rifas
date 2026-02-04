@@ -88,6 +88,8 @@ class RaffleViewModel(application: Application) : AndroidViewModel(application) 
                         packageInfo.versionCode
                     }
                     
+                    android.util.Log.d("UpdateCheck", "Current Version: $currentVersionCode, Remote Version: ${updateInfo.versionCode}")
+                    
                     if (updateInfo.versionCode > currentVersionCode) {
                         withContext(Dispatchers.Main) {
                             updateAvailable.value = updateInfo
