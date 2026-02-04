@@ -345,6 +345,7 @@ data class BuyerSummary(
     val numbersListText: String get() = soldNumbers.joinToString(", ") { it.number }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BuyerListItem(
     buyer: BuyerSummary,
