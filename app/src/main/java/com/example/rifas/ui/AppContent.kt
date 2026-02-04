@@ -59,6 +59,9 @@ import java.io.FileOutputStream
 import java.text.NumberFormat
 import java.util.Locale
 
+import androidx.compose.ui.graphics.Brush
+import com.example.rifas.ui.theme.*
+
 @Composable
 fun RifasApp(viewModel: RaffleViewModel) {
     val navController = rememberNavController()
@@ -1298,11 +1301,29 @@ fun DashboardScreen(
         soldCount * pricePerNum
     }
 
-    // Ganancia Neta: Solo números PAGADOS de rifas activas
+    // Ganancia Neta Actual: Solo números PAGADOS de rifas activas
     val totalNetRevenue = activeRaffles.sumOf { raffle ->
         val pricePerNum = raffle.price.toDoubleOrNull() ?: 0.0
         val paidCount = allSoldNumbers.count { it.raffleId == raffle.id && it.isPaid }
         paidCount * pricePerNum
+    }
+
+    // Ganancia Potencial Total: Todos los números generados * precio (de todas las rifas activas)
+    val totalPotentialRevenue = activeRaffles.sumOf { raffle ->
+        val pricePerNum = raffle.price.toDoubleOrNull() ?: 0.0
+        val totalNumbers = (raffle.rangeEnd - raffle.rangeStart + 1)
+        totalNumbers * pricePerNum
+    }
+
+    // Clientes más fieles (Top 10)
+    val loyalClients = remember(allSoldNumbers) {
+        allSoldNumbers.groupBy { it.buyerPhone.trim() }
+            .map { (phone, numbers) ->
+                val name = numbers.first().buyerName
+                name to numbers.size
+            }
+            .sortedByDescending { it.second }
+            .take(10)
     }
 
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("es", "CO"))
@@ -1310,10 +1331,16 @@ fun DashboardScreen(
     Scaffold(
         topBar = {
             LargeTopAppBar(
-                title = { Text("Panel Principal", fontWeight = FontWeight.Bold) },
+                title = { 
+                    Text(
+                        "Panel Principal", 
+                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.headlineMedium
+                    ) 
+                },
                 colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = LogoBlue,
+                    titleContentColor = Color.White
                 )
             )
         }
@@ -1322,6 +1349,11 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(LogoBlue.copy(alpha = 0.05f), BackgroundLight)
+                    )
+                )
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -1329,40 +1361,93 @@ fun DashboardScreen(
             // Tarjeta de Ganancias
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                shape = MaterialTheme.shapes.extraLarge
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Resumen de Ganancias (Rifas Activas)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Column(
+                    modifier = Modifier
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(LogoBlue, LogoCyan)
+                            )
+                        )
+                        .padding(20.dp)
+                ) {
+                    Text(
+                        "Resumen de Ganancias", 
+                        style = MaterialTheme.typography.titleMedium, 
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
-                            Text("Ganancia Bruta", style = MaterialTheme.typography.bodySmall)
-                            Text(currencyFormatter.format(totalGrossRevenue), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            Text("Ganancia Bruta", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
+                            Text(currencyFormatter.format(totalGrossRevenue), style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.ExtraBold)
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            Text("Ganancia Neta", style = MaterialTheme.typography.bodySmall)
-                            Text(currencyFormatter.format(totalNetRevenue), style = MaterialTheme.typography.headlineSmall, color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
+                            Text("Ganancia Neta", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f))
+                            Text(currencyFormatter.format(totalNetRevenue), style = MaterialTheme.typography.headlineMedium, color = LogoYellow, fontWeight = FontWeight.ExtraBold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Ganancia Potencial (Total Generado)
+                    Surface(
+                        color = Color.White.copy(alpha = 0.15f),
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Meta Total (Números Generados):",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                currencyFormatter.format(totalPotentialRevenue),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = LogoYellow,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    // "Gráfica" simple (Barra de progreso)
+                    // "Gráfica" mejorada
                     val progress = if (totalGrossRevenue > 0) (totalNetRevenue / totalGrossRevenue).toFloat() else 0f
-                    LinearProgressIndicator(
-                        progress = { progress },
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(12.dp),
-                        color = Color(0xFF4CAF50),
-                        trackColor = MaterialTheme.colorScheme.error.copy(alpha = 0.2f),
-                    )
+                            .height(14.dp)
+                            .background(Color.White.copy(alpha = 0.3f), MaterialTheme.shapes.extraLarge)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progress)
+                                .fillMaxHeight()
+                                .background(
+                                    Brush.horizontalGradient(listOf(LogoYellow, LogoOrange)),
+                                    MaterialTheme.shapes.extraLarge
+                                )
+                        )
+                    }
                     Text(
                         text = "${(progress * 100).toInt()}% recaudado",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelLarge,
                         modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.End
+                        textAlign = TextAlign.End,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -1374,6 +1459,7 @@ fun DashboardScreen(
                     subtitle = "${raffles.size} totales",
                     icon = Icons.Default.Casino,
                     modifier = Modifier.weight(1f),
+                    color = LogoPink,
                     onClick = onNavigateToRaffles
                 )
                 DashboardActionCard(
@@ -1381,8 +1467,73 @@ fun DashboardScreen(
                     subtitle = "Ver lista",
                     icon = Icons.Default.Group,
                     modifier = Modifier.weight(1f),
+                    color = LogoPurple,
                     onClick = onNavigateToBuyers
                 )
+            }
+
+            // Gráfica de Clientes más fieles
+            if (loyalClients.isNotEmpty()) {
+                Text("Top 10 Clientes más Fieles", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        loyalClients.forEachIndexed { index, client ->
+                            val maxPurchases = loyalClients.first().second.toFloat()
+                            val clientProgress = client.second / maxPurchases
+                            
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${index + 1}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = LogoBlue,
+                                    modifier = Modifier.width(24.dp)
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(client.first, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                        Text("${client.second} núm.", style = MaterialTheme.typography.bodySmall, color = LogoPink, fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(8.dp)
+                                            .background(BackgroundLight, MaterialTheme.shapes.extraLarge)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(clientProgress)
+                                                .fillMaxHeight()
+                                                .background(
+                                                    Brush.horizontalGradient(
+                                                        colors = listOf(LogoBlue, LogoCyan)
+                                                    ),
+                                                    MaterialTheme.shapes.extraLarge
+                                                )
+                                        )
+                                    }
+                                }
+                            }
+                            if (index < loyalClients.size - 1) {
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 0.5.dp, color = Color.LightGray.copy(alpha = 0.5f))
+                            }
+                        }
+                    }
+                }
             }
 
             // Lista de Rifas Activas y sus Pagos
@@ -1426,24 +1577,32 @@ fun DashboardActionCard(
     subtitle: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     modifier: Modifier = Modifier,
+    color: Color = LogoBlue,
     onClick: () -> Unit
 ) {
     Card(
         modifier = modifier.height(120.dp),
         onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = MaterialTheme.shapes.large
     ) {
         Column(
             modifier = Modifier
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(color, color.copy(alpha = 0.7f))
+                    )
+                )
                 .padding(16.dp)
                 .fillMaxSize(),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(icon, contentDescription = null, modifier = Modifier.size(32.dp), tint = Color.White)
             Spacer(modifier = Modifier.height(8.dp))
-            Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall)
+            Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = Color.White)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.9f))
         }
     }
 }
@@ -1463,7 +1622,11 @@ fun IntroScreen(onFinished: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.primaryContainer),
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(LogoBlue, LogoCyan)
+                )
+            ),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -1472,16 +1635,32 @@ fun IntroScreen(onFinished: () -> Unit) {
                 .alpha(alpha)
                 .scale(scale)
         ) {
+            // Un círculo blanco suave detrás del texto o logo
+            Surface(
+                modifier = Modifier.size(120.dp),
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = Color.White.copy(alpha = 0.2f)
+            ) {
+                Icon(
+                    Icons.Default.Casino,
+                    contentDescription = null,
+                    modifier = Modifier.padding(24.dp).size(64.dp),
+                    tint = Color.White
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "Bienvenido a Rifas",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                text = "Rifas",
+                style = MaterialTheme.typography.displayMedium,
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Crea y gestiona tus rifas",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                text = "Tu suerte en tus manos",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White.copy(alpha = 0.9f),
+                fontWeight = FontWeight.Medium
             )
         }
     }
@@ -1502,16 +1681,24 @@ fun RaffleListScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(text = "Mis Rifas") },
+                title = { Text(text = "Mis Rifas", fontWeight = FontWeight.ExtraBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás", tint = Color.White)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = LogoBlue,
+                    titleContentColor = Color.White
+                )
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onCreateRaffle) {
+            FloatingActionButton(
+                onClick = onCreateRaffle,
+                containerColor = LogoYellow,
+                contentColor = TextDark
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "Crear rifa")
             }
         }
@@ -1520,16 +1707,18 @@ fun RaffleListScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
+                    .padding(innerPadding)
+                    .background(BackgroundLight),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "No tienes rifas creadas")
+                Text(text = "No tienes rifas creadas", style = MaterialTheme.typography.bodyLarge)
             }
         } else {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
+                    .padding(innerPadding)
+                    .background(BackgroundLight),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -1603,7 +1792,10 @@ fun RaffleItem(raffle: Raffle, onClick: () -> Unit, onLongClick: () -> Unit, onE
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, if (raffle.isActive) LogoBlue.copy(alpha = 0.2f) else Color.LightGray)
     ) {
         Row(
             modifier = Modifier
@@ -1611,39 +1803,59 @@ fun RaffleItem(raffle: Raffle, onClick: () -> Unit, onLongClick: () -> Unit, onE
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Icono representativo
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = MaterialTheme.shapes.small,
+                color = if (raffle.isActive) LogoBlue.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.1f)
+            ) {
+                Icon(
+                    Icons.Default.Casino,
+                    contentDescription = null,
+                    modifier = Modifier.padding(12.dp),
+                    tint = if (raffle.isActive) LogoBlue else Color.Gray
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = raffle.name,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = TextDark
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Surface(
-                        color = if (raffle.isActive) Color(0xFF4CAF50) else Color.Gray,
+                        color = if (raffle.isActive) LogoCyan else Color.Gray,
                         shape = MaterialTheme.shapes.extraSmall
                     ) {
                         Text(
                             text = if (raffle.isActive) "ACTIVA" else "INACTIVA",
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                            color = Color.White,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            color = if (raffle.isActive) LogoPurple else Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.ExtraBold
                         )
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "Rango: ${raffle.rangeStart} - ${raffle.rangeEnd}",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray
                 )
                 Text(
                     text = "Precio: ${raffle.price}",
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LogoPink,
+                    fontWeight = FontWeight.Bold
                 )
             }
             IconButton(onClick = onEditStatus) {
-                Icon(Icons.Default.Edit, contentDescription = "Editar estado", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.Edit, contentDescription = "Editar estado", tint = LogoBlue)
             }
         }
     }
