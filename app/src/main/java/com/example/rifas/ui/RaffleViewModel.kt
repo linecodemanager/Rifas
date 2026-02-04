@@ -38,9 +38,7 @@ class RaffleViewModel(application: Application) : AndroidViewModel(application) 
     fun checkForUpdates() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // NOTA: Esta URL debe ser cambiada por una real donde alojes el archivo JSON
-                // Ejemplo: "https://raw.githubusercontent.com/usuario/repo/main/update.json"
-                val url = "https://raw.githubusercontent.com/tusuario/rifas/main/update.json"
+                val url = "https://raw.githubusercontent.com/linecodemanager/Rifas/main/update.json"
                 
                 val client = OkHttpClient()
                 val request = Request.Builder().url(url).build()
