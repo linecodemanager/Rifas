@@ -39,4 +39,7 @@ interface RaffleDao {
 
     @Query("DELETE FROM sold_numbers WHERE raffleId = :raffleId")
     suspend fun deleteSoldNumbersByRaffleId(raffleId: Long)
+
+    @Query("SELECT * FROM sold_numbers")
+    fun getAllSoldNumbers(): Flow<List<SoldNumber>>
 }

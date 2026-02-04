@@ -41,8 +41,30 @@ class RaffleViewModel(application: Application) : AndroidViewModel(application) 
 
     val updateAvailable = mutableStateOf<AppUpdate?>(null)
     val isDownloading = mutableStateOf(false)
+    private var currentDownloadId: Long? = null
 
     fun checkForUpdates() {
+        if (isDownloading.value) return
+        
+        // Verificar si hay una descarga en curso en DownloadManager
+        val downloadManager = getApplication<Application>().getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val query = DownloadManager.Query().setFilterByStatus(
+            DownloadManager.STATUS_RUNNING or DownloadManager.STATUS_PENDING or DownloadManager.STATUS_PAUSED
+        )
+        val cursor = downloadManager.query(query)
+        if (cursor != null && cursor.moveToFirst()) {
+            val titleIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TITLE)
+            if (titleIndex != -1) {
+                val title = cursor.getString(titleIndex)
+                if (title == "Descargando actualización de Rifas") {
+                    isDownloading.value = true
+                    cursor.close()
+                    return
+                }
+            }
+            cursor.close()
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val url = "https://raw.githubusercontent.com/linecodemanager/Rifas/main/update.json"
@@ -83,16 +105,23 @@ class RaffleViewModel(application: Application) : AndroidViewModel(application) 
         isDownloading.value = true
 
         try {
+            // Limpiar descarga anterior si existe
+            val oldFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "rifas_update.apk")
+            if (oldFile.exists()) {
+                oldFile.delete()
+            }
+
             val request = DownloadManager.Request(Uri.parse(url))
                 .setTitle("Descargando actualización de Rifas")
                 .setDescription("Preparando nueva versión...")
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "rifas_update.apk")
+                .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "rifas_update.apk")
                 .setAllowedOverMetered(true)
                 .setAllowedOverRoaming(true)
 
             val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             val downloadId = downloadManager.enqueue(request)
+            currentDownloadId = downloadId
 
             // Escuchar cuando termine la descarga
             val onComplete = object : BroadcastReceiver() {
@@ -100,32 +129,50 @@ class RaffleViewModel(application: Application) : AndroidViewModel(application) 
                     val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
                     if (id == downloadId) {
                         isDownloading.value = false
+                        currentDownloadId = null
                         installApk(context)
-                        context.unregisterReceiver(this)
+                        try {
+                            context.unregisterReceiver(this)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     }
                 }
             }
-            context.registerReceiver(onComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+            
+            val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(onComplete, filter, Context.RECEIVER_EXPORTED)
+            } else {
+                context.registerReceiver(onComplete, filter)
+            }
             
         } catch (e: Exception) {
             isDownloading.value = false
+            currentDownloadId = null
             e.printStackTrace()
         }
     }
 
     private fun installApk(context: Context) {
-        val file = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "rifas_update.apk")
-        if (file.exists()) {
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            val intent = Intent(Intent.ACTION_VIEW)
-            intent.setDataAndType(uri, "application/vnd.android.package-archive")
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
+        try {
+            val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "rifas_update.apk")
+            if (file.exists()) {
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                val intent = Intent(Intent.ACTION_VIEW)
+                intent.setDataAndType(uri, "application/vnd.android.package-archive")
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                context.startActivity(intent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
     val raffles: Flow<List<Raffle>> = repository.allRaffles
+    val allSoldNumbers: Flow<List<SoldNumber>> = repository.allSoldNumbers
 
     fun addRaffle(name: String, rangeStart: Int, rangeEnd: Int, digits: Int, drawDate: String, lotteryName: String, prize: String, price: String) {
         viewModelScope.launch {

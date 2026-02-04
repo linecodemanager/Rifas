@@ -13,6 +13,8 @@ class RaffleRepository(private val raffleDao: RaffleDao) {
 
     fun getSoldNumbers(raffleId: Long): Flow<List<SoldNumber>> = raffleDao.getSoldNumbersByRaffleId(raffleId)
 
+    val allSoldNumbers: Flow<List<SoldNumber>> = raffleDao.getAllSoldNumbers()
+
     suspend fun updateSoldNumber(soldNumber: SoldNumber) = raffleDao.updateSoldNumber(soldNumber)
 
     suspend fun updateRaffle(raffle: Raffle) = raffleDao.updateRaffle(raffle)

@@ -74,7 +74,13 @@ fun RifasApp(viewModel: RaffleViewModel) {
             DashboardScreen(
                 viewModel = viewModel,
                 onNavigateToRaffles = { navController.navigate("list") },
-                onNavigateToBuyers = { /* Opcional: una pantalla global de clientes */ }
+                onNavigateToBuyers = { navController.navigate("global_buyers") }
+            )
+        }
+        composable("global_buyers") {
+            GlobalBuyersScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() }
             )
         }
         composable("list") {
@@ -114,6 +120,224 @@ fun RifasApp(viewModel: RaffleViewModel) {
                 onBack = { navController.popBackStack() }
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun GlobalBuyersScreen(
+    viewModel: RaffleViewModel,
+    onBack: () -> Unit
+) {
+    val allSoldNumbers by viewModel.allSoldNumbers.collectAsState(initial = emptyList())
+    var searchQuery by remember { mutableStateOf("") }
+    var filterType by remember { mutableStateOf("Todos") } // "Todos", "Pagos", "No Pagos"
+
+    // Estados para los diálogos
+    var selectedBuyerForNumbers by remember { mutableStateOf<BuyerSummary?>(null) }
+    var selectedBuyerForPayment by remember { mutableStateOf<BuyerSummary?>(null) }
+    var showConfirmPaymentDialog by remember { mutableStateOf<BuyerSummary?>(null) }
+
+    // Agrupar por comprador globalmente (nombre + teléfono)
+    val buyerGroups = remember(allSoldNumbers) {
+        allSoldNumbers.groupBy { it.buyerName.lowercase().trim() + it.buyerPhone.trim() }
+            .map { (_, numbers) ->
+                BuyerSummary(
+                    name = numbers.first().buyerName,
+                    phone = numbers.first().buyerPhone,
+                    soldNumbers = numbers
+                )
+            }
+            .sortedBy { it.name }
+    }
+
+    val filteredList = buyerGroups.filter { buyer ->
+        val matchesSearch = buyer.name.contains(searchQuery, ignoreCase = true) || 
+                          buyer.soldNumbers.any { it.number.contains(searchQuery) }
+        val matchesFilter = when (filterType) {
+            "Pagos" -> buyer.isFullyPaid
+            "No Pagos" -> !buyer.isFullyPaid
+            else -> true
+        }
+        matchesSearch && matchesFilter
+    }
+
+    Scaffold(
+        topBar = {
+            Column {
+                CenterAlignedTopAppBar(
+                    title = { Text(text = "Lista Global de Clientes") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
+                        }
+                    }
+                )
+                // Barra de búsqueda y filtros
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Buscar cliente o número") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.medium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Todos", "Pagos", "No Pagos").forEach { type ->
+                            FilterChip(
+                                selected = filterType == type,
+                                onClick = { filterType = type },
+                                label = { Text(type) }
+                            )
+                        }
+                    }
+                }
+                HorizontalDivider()
+            }
+        }
+    ) { innerPadding ->
+        if (filteredList.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (searchQuery.isNotBlank() || filterType != "Todos") 
+                        "No se encontraron clientes" else "Aún no hay ventas registradas",
+                    color = Color.Gray
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(filteredList) { buyer ->
+                    BuyerListItem(
+                        buyer = buyer,
+                        onViewNumbers = { selectedBuyerForNumbers = buyer },
+                        onClick = { 
+                            if (!buyer.isFullyPaid) {
+                                selectedBuyerForPayment = buyer 
+                            }
+                        },
+                        onDelete = { 
+                            buyer.soldNumbers.forEach { viewModel.deleteSoldNumber(it) }
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    // Modal para ver números comprados
+    selectedBuyerForNumbers?.let { buyer ->
+        AlertDialog(
+            onDismissRequest = { selectedBuyerForNumbers = null },
+            title = { Text("Números de ${buyer.name}") },
+            text = {
+                Column {
+                    Text("Este cliente tiene los siguientes números:", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        buyer.soldNumbers.forEach { sold ->
+                            SuggestionChip(
+                                onClick = { },
+                                label = { Text(sold.number) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = if (sold.isPaid) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                                    labelColor = if (sold.isPaid) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                )
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedBuyerForNumbers = null }) {
+                    Text("Cerrar")
+                }
+            }
+        )
+    }
+
+    // Modal para elegir pago
+    selectedBuyerForPayment?.let { buyer ->
+        AlertDialog(
+            onDismissRequest = { selectedBuyerForPayment = null },
+            title = { Text("Actualizar pago") },
+            text = {
+                Column {
+                    Text("Cliente: ${buyer.name}")
+                    Text("Números: ${buyer.numbersListText}")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            selectedBuyerForPayment = null
+                            showConfirmPaymentDialog = buyer
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                    ) {
+                        Text("Marcar como PAGADO")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedBuyerForPayment = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Confirmación irreversible
+    showConfirmPaymentDialog?.let { buyer ->
+        AlertDialog(
+            onDismissRequest = { showConfirmPaymentDialog = null },
+            icon = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(48.dp)) },
+            title = { Text("¿Confirmar pago?") },
+            text = {
+                Text(
+                    "¿Estás seguro de marcar todos los números de ${buyer.name} como PAGADOS? Esta acción no se puede deshacer.",
+                    textAlign = TextAlign.Center
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        buyer.soldNumbers.forEach { sold ->
+                            if (!sold.isPaid) {
+                                viewModel.updateSoldNumber(sold.copy(isPaid = true))
+                            }
+                        }
+                        showConfirmPaymentDialog = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                ) {
+                    Text("SÍ, CONFIRMAR")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmPaymentDialog = null }) {
+                    Text("CANCELAR")
+                }
+            }
+        )
     }
 }
 
@@ -1008,7 +1232,7 @@ fun DashboardScreen(
 ) {
     val context = LocalContext.current
     val raffles by viewModel.raffles.collectAsState(initial = emptyList())
-    val allSoldNumbers = remember { mutableStateListOf<SoldNumber>() }
+    val allSoldNumbers by viewModel.allSoldNumbers.collectAsState(initial = emptyList())
     val updateAvailable by viewModel.updateAvailable
     val isDownloading by viewModel.isDownloading
     
@@ -1062,16 +1286,6 @@ fun DashboardScreen(
                 }
             }
         )
-    }
-    
-    // Recolectar todos los números vendidos de todas las rifas para las estadísticas
-    LaunchedEffect(raffles) {
-        allSoldNumbers.clear()
-        raffles.forEach { raffle ->
-            viewModel.getSoldNumbers(raffle.id).collect { sold ->
-                allSoldNumbers.addAll(sold)
-            }
-        }
     }
 
     // Cálculos de estadísticas
@@ -1167,7 +1381,7 @@ fun DashboardScreen(
                     subtitle = "Ver lista",
                     icon = Icons.Default.Group,
                     modifier = Modifier.weight(1f),
-                    onClick = { /* Implementar navegación a lista global si se desea */ }
+                    onClick = onNavigateToBuyers
                 )
             }
 
