@@ -5,10 +5,14 @@
 
 package com.example.rifas.ui
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -61,6 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -91,9 +96,23 @@ fun RifasApp(viewModel: RaffleViewModel) {
     val context = LocalContext.current
     val updateInfo = viewModel.updateAvailable.value
     val isDownloading = viewModel.isDownloading.value
+    var showInstallDownloaded by remember { mutableStateOf(false) }
+    var pendingUpdateUrl by remember { mutableStateOf<String?>(null) }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val url = pendingUpdateUrl
+        pendingUpdateUrl = null
+        if (granted && url != null) {
+            viewModel.downloadUpdate(context, url)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.checkForUpdates()
+        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "rifas_update.apk")
+        if (file.exists()) showInstallDownloaded = true
     }
 
     NavHost(navController = navController, startDestination = "intro") {
@@ -158,13 +177,41 @@ fun RifasApp(viewModel: RaffleViewModel) {
             text = { Text(updateInfo.description) },
             confirmButton = {
                 Button(
-                    onClick = { viewModel.downloadUpdate(context, updateInfo.updateUrl) },
+                    onClick = {
+                        val url = updateInfo.updateUrl
+                        if (Build.VERSION.SDK_INT >= 33) {
+                            val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                            if (!granted) {
+                                pendingUpdateUrl = url
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                viewModel.downloadUpdate(context, url)
+                            }
+                        } else {
+                            viewModel.downloadUpdate(context, url)
+                        }
+                    },
                     enabled = !isDownloading
                 ) { Text(if (isDownloading) "Descargando..." else "Actualizar") }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.updateAvailable.value = null }, enabled = !isDownloading) { Text("Más tarde") }
             }
+        )
+    }
+
+    if (showInstallDownloaded && !isDownloading) {
+        AlertDialog(
+            onDismissRequest = { showInstallDownloaded = false },
+            title = { Text("Actualización descargada") },
+            text = { Text("Ya hay una actualización descargada. ¿Quieres instalarla ahora?") },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.installDownloadedUpdate(context)
+                    showInstallDownloaded = false
+                }) { Text("Instalar") }
+            },
+            dismissButton = { TextButton(onClick = { showInstallDownloaded = false }) { Text("Después") } }
         )
     }
 }

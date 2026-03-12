@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.database.Cursor
 import android.net.Uri
 import android.os.Environment
 import androidx.compose.runtime.mutableStateOf
@@ -130,9 +131,12 @@ class RaffleViewModel(application: Application) : AndroidViewModel(application) 
                 override fun onReceive(context: Context, intent: Intent) {
                     val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
                     if (id == downloadId) {
+                        val success = downloadSucceeded(context, downloadId)
                         isDownloading.value = false
                         currentDownloadId = null
-                        installApk(context)
+                        if (success) {
+                            installApk(context)
+                        }
                         try {
                             context.unregisterReceiver(this)
                         } catch (e: Exception) {
@@ -144,7 +148,7 @@ class RaffleViewModel(application: Application) : AndroidViewModel(application) 
             
             val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                context.registerReceiver(onComplete, filter, Context.RECEIVER_EXPORTED)
+                context.registerReceiver(onComplete, filter, Context.RECEIVER_NOT_EXPORTED)
             } else {
                 context.registerReceiver(onComplete, filter)
             }
@@ -153,6 +157,23 @@ class RaffleViewModel(application: Application) : AndroidViewModel(application) 
             isDownloading.value = false
             currentDownloadId = null
             e.printStackTrace()
+        }
+    }
+
+    fun installDownloadedUpdate(context: Context) {
+        installApk(context)
+    }
+
+    private fun downloadSucceeded(context: Context, downloadId: Long): Boolean {
+        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val cursor: Cursor? = downloadManager.query(DownloadManager.Query().setFilterById(downloadId))
+        cursor ?: return false
+        cursor.use {
+            if (!it.moveToFirst()) return false
+            val statusIndex = it.getColumnIndex(DownloadManager.COLUMN_STATUS)
+            if (statusIndex == -1) return false
+            val status = it.getInt(statusIndex)
+            return status == DownloadManager.STATUS_SUCCESSFUL
         }
     }
 
