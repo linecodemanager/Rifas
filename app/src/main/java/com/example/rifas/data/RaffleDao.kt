@@ -37,6 +37,12 @@ interface RaffleDao {
     @Query("SELECT * FROM sold_numbers WHERE raffleId = :raffleId")
     fun getSoldNumbersByRaffleId(raffleId: Long): Flow<List<SoldNumber>>
 
+    @Query("UPDATE sold_numbers SET isPaid = :isPaid WHERE raffleId = :raffleId AND buyerName = :buyerName AND buyerPhone = :buyerPhone")
+    suspend fun setPaidForBuyer(raffleId: Long, buyerName: String, buyerPhone: String, isPaid: Boolean): Int
+
+    @Query("DELETE FROM sold_numbers WHERE raffleId = :raffleId AND buyerName = :buyerName AND buyerPhone = :buyerPhone")
+    suspend fun deleteSoldNumbersForBuyer(raffleId: Long, buyerName: String, buyerPhone: String): Int
+
     @Query("DELETE FROM sold_numbers WHERE raffleId = :raffleId")
     suspend fun deleteSoldNumbersByRaffleId(raffleId: Long)
 

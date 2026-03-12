@@ -14,19 +14,26 @@ import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
     primary = LogoBlueDark,
-    secondary = LogoPinkDark,
-    tertiary = LogoYellow,
-    background = Color(0xFF121212),
-    surface = Color(0xFF1E1E1E),
-    onPrimary = Color.Black,
+    secondary = LogoCyanDark,
+    tertiary = LogoYellowDark,
+    background = Color(0xFF0F141A),
+    surface = Color(0xFF151B22),
+    onPrimary = Color.White,
     onSecondary = Color.Black,
-    onBackground = Color.White,
-    onSurface = Color.White
+    onTertiary = Color.Black,
+    onBackground = Color(0xFFE6EDF3),
+    onSurface = Color(0xFFE6EDF3),
+    primaryContainer = LogoBlue.copy(alpha = 0.18f),
+    secondaryContainer = LogoCyan.copy(alpha = 0.18f),
+    tertiaryContainer = LogoYellow.copy(alpha = 0.20f),
+    onPrimaryContainer = Color.White,
+    onSecondaryContainer = Color.White,
+    onTertiaryContainer = Color.Black
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = LogoBlue,
-    secondary = LogoPink,
+    secondary = LogoCyan,
     tertiary = LogoYellow,
     background = BackgroundLight,
     surface = SurfaceWhite,
@@ -36,7 +43,11 @@ private val LightColorScheme = lightColorScheme(
     onBackground = TextDark,
     onSurface = TextDark,
     primaryContainer = LogoBlue.copy(alpha = 0.1f),
-    secondaryContainer = LogoPink.copy(alpha = 0.1f)
+    secondaryContainer = LogoCyan.copy(alpha = 0.1f),
+    tertiaryContainer = LogoYellow.copy(alpha = 0.18f),
+    onPrimaryContainer = TextDark,
+    onSecondaryContainer = TextDark,
+    onTertiaryContainer = TextDark
 )
 
 @Composable

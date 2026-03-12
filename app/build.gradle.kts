@@ -7,16 +7,14 @@ plugins {
 
 android {
     namespace = "com.example.rifas"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.rifas"
         minSdk = 24
-        targetSdk = 36
-        versionCode = 3
-        versionName = "3.0"
+        targetSdk = 35
+        versionCode = 4
+        versionName = "3.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -59,6 +57,10 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.okhttp)
     implementation(libs.gson)
+    
+    // Coil para carga de imágenes
+    implementation("io.coil-kt:coil-compose:2.5.0")
+    
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

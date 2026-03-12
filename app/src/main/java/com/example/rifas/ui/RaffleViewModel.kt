@@ -255,6 +255,18 @@ class RaffleViewModel(application: Application) : AndroidViewModel(application) 
             repository.deleteSoldNumber(soldNumber)
         }
     }
+
+    fun setPaidForBuyer(raffleId: Long, buyerName: String, buyerPhone: String, isPaid: Boolean) {
+        viewModelScope.launch {
+            repository.setPaidForBuyer(raffleId, buyerName, buyerPhone, isPaid)
+        }
+    }
+
+    fun deleteSoldNumbersForBuyer(raffleId: Long, buyerName: String, buyerPhone: String) {
+        viewModelScope.launch {
+            repository.deleteSoldNumbersForBuyer(raffleId, buyerName, buyerPhone)
+        }
+    }
 }
 
 class RaffleViewModelFactory(private val application: Application) : ViewModelProvider.Factory {

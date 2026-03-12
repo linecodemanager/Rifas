@@ -21,6 +21,12 @@ class RaffleRepository(private val raffleDao: RaffleDao) {
 
     suspend fun deleteSoldNumber(soldNumber: SoldNumber) = raffleDao.deleteSoldNumber(soldNumber)
 
+    suspend fun setPaidForBuyer(raffleId: Long, buyerName: String, buyerPhone: String, isPaid: Boolean) =
+        raffleDao.setPaidForBuyer(raffleId, buyerName, buyerPhone, isPaid)
+
+    suspend fun deleteSoldNumbersForBuyer(raffleId: Long, buyerName: String, buyerPhone: String) =
+        raffleDao.deleteSoldNumbersForBuyer(raffleId, buyerName, buyerPhone)
+
     suspend fun deleteRaffle(raffle: Raffle) {
         raffleDao.deleteSoldNumbersByRaffleId(raffle.id)
         raffleDao.deleteRaffle(raffle)

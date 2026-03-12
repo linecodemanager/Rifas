@@ -14,5 +14,9 @@ data class Raffle(
     val lotteryName: String = "",
     val prize: String = "",
     val price: String = "",
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val backgroundImagePath: String? = null,
+    val imageScale: Float = 1f,
+    val imageOffsetX: Float = 0f,
+    val imageOffsetY: Float = 0f
 )
